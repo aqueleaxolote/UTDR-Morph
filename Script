@@ -1,0 +1,373 @@
+-- ============================================================
+--  MORPH SELECTOR – Collapsible Folders, Clean & Fast
+-- ============================================================
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Player = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+
+-- ========== CREATE GUI ==========
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "MorphSelector"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = Player:WaitForChild("PlayerGui")
+
+-- Main Frame
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 400, 0, 500)
+Main.Position = UDim2.new(0.5, -200, 0.5, -250)
+Main.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+Main.BorderSizePixel = 0
+Main.ClipsDescendants = true
+Main.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = Main
+
+-- Shadow (subtle)
+local Shadow = Instance.new("Frame")
+Shadow.Size = UDim2.new(1, 10, 1, 10)
+Shadow.Position = UDim2.new(0, -5, 0, -5)
+Shadow.BackgroundColor3 = Color3.fromRGB(0,0,0)
+Shadow.BackgroundTransparency = 0.6
+Shadow.BorderSizePixel = 0
+Shadow.Parent = Main
+local ShadowCorner = Instance.new("UICorner")
+ShadowCorner.CornerRadius = UDim.new(0, 10)
+ShadowCorner.Parent = Shadow
+
+-- Title Bar (draggable)
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 36)
+TitleBar.BackgroundColor3 = Color3.fromRGB(45, 45, 52)
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = Main
+
+local TitleCorner = Instance.new("UICorner")
+TitleCorner.CornerRadius = UDim.new(0, 10)
+TitleCorner.Parent = TitleBar
+
+local TitleLabel = Instance.new("TextLabel")
+TitleLabel.Size = UDim2.new(0.8, -10, 1, 0)
+TitleLabel.Position = UDim2.new(0, 12, 0, 0)
+TitleLabel.BackgroundTransparency = 1
+TitleLabel.Text = "📁 Morph Selector"
+TitleLabel.TextColor3 = Color3.fromRGB(255,255,255)
+TitleLabel.TextScaled = true
+TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+TitleLabel.Font = Enum.Font.GothamBold
+TitleLabel.Parent = TitleBar
+
+-- Close & Minimize buttons
+local function makeButton(text, color, x)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0, 30, 0, 30)
+	btn.Position = UDim2.new(1, x, 0, 3)
+	btn.BackgroundColor3 = color
+	btn.Text = text
+	btn.TextColor3 = Color3.fromRGB(255,255,255)
+	btn.TextScaled = true
+	btn.Font = Enum.Font.GothamBold
+	btn.BorderSizePixel = 0
+	btn.Parent = TitleBar
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 6)
+	c.Parent = btn
+	return btn
+end
+
+local CloseBtn = makeButton("✕", Color3.fromRGB(200,50,50), -38)
+local MinBtn   = makeButton("─", Color3.fromRGB(50,50,200), -74)
+
+-- Scroll Frame
+local Scroll = Instance.new("ScrollingFrame")
+Scroll.Size = UDim2.new(1, -12, 1, -48)
+Scroll.Position = UDim2.new(0, 6, 0, 42)
+Scroll.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+Scroll.BackgroundTransparency = 0.4
+Scroll.BorderSizePixel = 0
+Scroll.CanvasSize = UDim2.new(0,0,0,0)
+Scroll.ScrollBarThickness = 6
+Scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+Scroll.Parent = Main
+
+local ScrollCorner = Instance.new("UICorner")
+ScrollCorner.CornerRadius = UDim.new(0, 8)
+ScrollCorner.Parent = Scroll
+
+-- Main layout (folders)
+local MainLayout = Instance.new("UIListLayout")
+MainLayout.Padding = UDim.new(0, 6)
+MainLayout.SortOrder = Enum.SortOrder.Name
+MainLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+MainLayout.Parent = Scroll
+
+-- ========== DRAGGING ==========
+local drag = { active = false, startPos = nil, mouseStart = nil }
+
+TitleBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		drag.active = true
+		drag.startPos = Vector2.new(Main.Position.X.Scale, Main.Position.Y.Scale)
+		drag.mouseStart = Vector2.new(input.Position.X, input.Position.Y)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		drag.active = false
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if drag.active and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = Vector2.new(input.Position.X - drag.mouseStart.X, input.Position.Y - drag.mouseStart.Y)
+		Main.Position = UDim2.new(
+			drag.startPos.X + delta.X / 1000,
+			0,
+			drag.startPos.Y + delta.Y / 800,
+			0
+		)
+	end
+end)
+
+-- ========== MINIMIZE / CLOSE ==========
+local minimized = false
+MinBtn.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	if minimized then
+		TweenService:Create(Main, TweenInfo.new(0.2), { Size = UDim2.new(0,400,0,36) }):Play()
+		MinBtn.Text = "□"
+	else
+		TweenService:Create(Main, TweenInfo.new(0.2), { Size = UDim2.new(0,400,0,500) }):Play()
+		MinBtn.Text = "─"
+	end
+end)
+
+CloseBtn.MouseButton1Click:Connect(function()
+	ScreenGui:Destroy()
+end)
+
+-- ========== BUILD FOLDER SECTIONS ==========
+local MorphFolder = ReplicatedStorage:FindFirstChild("MorphFolder")
+if not MorphFolder then
+	warn("MorphFolder not found!")
+	return
+end
+
+local folderNames = { "aus/uts", "badges", "deltarune", "events", "gamepasses", "undertale" }
+
+-- Helper: create a single morph button
+local function createMorphBtn(morphObj, folderName, parentContainer)
+	local container = Instance.new("Frame")
+	container.Size = UDim2.new(0.94, 0, 0, 38)
+	container.BackgroundColor3 = Color3.fromRGB(40, 40, 46)
+	container.BackgroundTransparency = 0.2
+	container.BorderSizePixel = 0
+	container.Parent = parentContainer
+
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 6)
+	c.Parent = container
+
+	-- Name
+	local nameLbl = Instance.new("TextLabel")
+	nameLbl.Size = UDim2.new(0.6, -5, 1, 0)
+	nameLbl.Position = UDim2.new(0, 10, 0, 0)
+	nameLbl.BackgroundTransparency = 1
+	nameLbl.Text = morphObj.Name
+	nameLbl.TextColor3 = Color3.fromRGB(235,235,235)
+	nameLbl.TextScaled = true
+	nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+	nameLbl.Font = Enum.Font.Gotham
+	nameLbl.Parent = container
+
+	-- Folder tag
+	local tag = Instance.new("TextLabel")
+	tag.Size = UDim2.new(0.2, -5, 0.55, 0)
+	tag.Position = UDim2.new(0.6, 0, 0.5, -10)
+	tag.BackgroundColor3 = Color3.fromRGB(60,60,72)
+	tag.BackgroundTransparency = 0.3
+	tag.Text = folderName:upper()
+	tag.TextColor3 = Color3.fromRGB(190,190,190)
+	tag.TextScaled = true
+	tag.Font = Enum.Font.Gotham
+	tag.Parent = container
+	local tagC = Instance.new("UICorner")
+	tagC.CornerRadius = UDim.new(0, 4)
+	tagC.Parent = tag
+
+	-- Morph button
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0.18, -5, 0.7, 0)
+	btn.Position = UDim2.new(0.8, -5, 0.5, -12)
+	btn.BackgroundColor3 = Color3.fromRGB(70, 140, 255)
+	btn.Text = "Morph"
+	btn.TextColor3 = Color3.fromRGB(255,255,255)
+	btn.TextScaled = true
+	btn.Font = Enum.Font.GothamBold
+	btn.BorderSizePixel = 0
+	btn.Parent = container
+
+	local btnC = Instance.new("UICorner")
+	btnC.CornerRadius = UDim.new(0, 4)
+	btnC.Parent = btn
+
+	-- Hover
+	btn.MouseEnter:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(100, 170, 255) }):Play()
+	end)
+	btn.MouseLeave:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(70, 140, 255) }):Play()
+	end)
+
+	-- Click → fire remote with the exact Instance
+	btn.MouseButton1Click:Connect(function()
+		local args = { "morph", morphObj }
+		ReplicatedStorage.MorphEvent:FireServer(unpack(args))
+
+		-- Visual feedback
+		btn.Text = "✓"
+		TweenService:Create(btn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(50, 200, 50) }):Play()
+		task.wait(0.3)
+		TweenService:Create(btn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(70, 140, 255) }):Play()
+		task.wait(0.2)
+		btn.Text = "Morph"
+	end)
+end
+
+-- Create a folder header + morph container (collapsed by default)
+local function createFolderSection(folderName, folder)
+	-- Header
+	local header = Instance.new("Frame")
+	header.Size = UDim2.new(0.94, 0, 0, 34)  -- will be adjusted later
+	header.BackgroundColor3 = Color3.fromRGB(55, 55, 64)
+	header.BorderSizePixel = 0
+	header.Parent = Scroll
+
+	local hCorner = Instance.new("UICorner")
+	hCorner.CornerRadius = UDim.new(0, 8)
+	hCorner.Parent = header
+
+	local title = Instance.new("TextLabel")
+	title.Size = UDim2.new(0.85, -10, 1, 0)
+	title.Position = UDim2.new(0, 12, 0, 0)
+	title.BackgroundTransparency = 1
+	title.Text = "📁 " .. folderName:upper()
+	title.TextColor3 = Color3.fromRGB(255, 220, 140)
+	title.TextScaled = true
+	title.TextXAlignment = Enum.TextXAlignment.Left
+	title.Font = Enum.Font.GothamBold
+	title.Parent = header
+
+	local toggle = Instance.new("TextButton")
+	toggle.Size = UDim2.new(0, 30, 0, 30)
+	toggle.Position = UDim2.new(1, -34, 0, 2)
+	toggle.BackgroundColor3 = Color3.fromRGB(65, 65, 75)
+	toggle.Text = "▶"   -- collapsed by default
+	toggle.TextColor3 = Color3.fromRGB(255,255,255)
+	toggle.TextScaled = true
+	toggle.Font = Enum.Font.GothamBold
+	toggle.BorderSizePixel = 0
+	toggle.Parent = header
+
+	local tCorner = Instance.new("UICorner")
+	tCorner.CornerRadius = UDim.new(0, 5)
+	tCorner.Parent = toggle
+
+	-- Container for morphs (hidden initially)
+	local morphContainer = Instance.new("Frame")
+	morphContainer.Size = UDim2.new(1, 0, 0, 0)
+	morphContainer.BackgroundTransparency = 1
+	morphContainer.AutomaticSize = Enum.AutomaticSize.Y
+	morphContainer.ClipsDescendants = true
+	morphContainer.Visible = false   -- start collapsed
+	morphContainer.Parent = header
+
+	local mLayout = Instance.new("UIListLayout")
+	mLayout.Padding = UDim.new(0, 4)
+	mLayout.SortOrder = Enum.SortOrder.Name
+	mLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	mLayout.Parent = morphContainer
+
+	-- Populate morphs
+	local count = 0
+	for _, child in pairs(folder:GetChildren()) do
+		-- treat every direct child as a morph
+		createMorphBtn(child, folderName, morphContainer)
+		count = count + 1
+	end
+
+	-- Set initial height (only header visible)
+	header.Size = UDim2.new(0.94, 0, 0, 34)
+
+	-- Toggle expand/collapse
+	local expanded = false
+	toggle.MouseButton1Click:Connect(function()
+		expanded = not expanded
+		if expanded then
+			morphContainer.Visible = true
+			toggle.Text = "▼"
+			header.Size = UDim2.new(0.94, 0, 0, 34 + count * 42)
+		else
+			morphContainer.Visible = false
+			toggle.Text = "▶"
+			header.Size = UDim2.new(0.94, 0, 0, 34)
+		end
+	end)
+
+	return header, count
+end
+
+-- ========== SCAN ALL FOLDERS ==========
+local total = 0
+for _, name in ipairs(folderNames) do
+	local folder = MorphFolder:FindFirstChild(name)
+	if folder then
+		local _, cnt = createFolderSection(name, folder)
+		total = total + cnt
+	else
+		warn("Folder missing: " .. name)
+	end
+end
+
+if total == 0 then
+	local empty = Instance.new("TextLabel")
+	empty.Size = UDim2.new(1, 0, 0, 40)
+	empty.BackgroundTransparency = 1
+	empty.Text = "No morphs found"
+	empty.TextColor3 = Color3.fromRGB(200,200,200)
+	empty.TextScaled = true
+	empty.Font = Enum.Font.Gotham
+	empty.Parent = Scroll
+end
+
+-- ========== RESET BUTTON ==========
+local ResetBtn = Instance.new("TextButton")
+ResetBtn.Size = UDim2.new(0.2, 0, 0, 30)
+ResetBtn.Position = UDim2.new(0.4, 0, 1, -40)
+ResetBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+ResetBtn.Text = "Reset"
+ResetBtn.TextColor3 = Color3.fromRGB(255,255,255)
+ResetBtn.TextScaled = true
+ResetBtn.Font = Enum.Font.GothamBold
+ResetBtn.BorderSizePixel = 0
+ResetBtn.Parent = Main
+
+local rCorner = Instance.new("UICorner")
+rCorner.CornerRadius = UDim.new(0, 6)
+rCorner.Parent = ResetBtn
+
+ResetBtn.MouseButton1Click:Connect(function()
+	-- Use the remote event to reset
+	ReplicatedStorage.MorphEvent:FireServer("reset")
+	-- Visual feedback
+	TweenService:Create(ResetBtn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(60, 200, 60) }):Play()
+	task.wait(0.4)
+	TweenService:Create(ResetBtn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(200, 60, 60) }):Play()
+end)
+
+print("✅ Morph Selector loaded – " .. total .. " morphs available.")
